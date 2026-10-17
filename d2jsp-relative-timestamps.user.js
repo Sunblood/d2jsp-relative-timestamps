@@ -21,6 +21,8 @@
     var TS_RE = /^([A-Z][a-z]{2}) (\d{1,2}) (\d{4}) (\d{2}):(\d{2})(am|pm)$/;
     // e.g. "This post was edited by Sunblood on Aug 25 2026 09:39am"
     var EDIT_RE = /on ([A-Z][a-z]{2}) (\d{1,2}) (\d{4}) (\d{2}):(\d{2})(am|pm)/;
+    // Post timestamps are span#td<id>. Search results use a bare <div class="desc"> instead.
+    var TIMESTAMP_SELECTOR = 'span[id^="td"], div.desc';
 
     function parseTimestampParts(m) {
         var month = MONTHS[m[1]];
@@ -131,12 +133,12 @@
         if (root.nodeType !== 1) return;
 
         // Process root itself if applicable
-        if (root.matches('span[id^="td"]')) {
+        if (root.matches(TIMESTAMP_SELECTOR)) {
             processElement(root);
         }
 
-        // Process timestamp spans
-        root.querySelectorAll('span[id^="td"]').forEach(processElement);
+        // Process timestamp elements
+        root.querySelectorAll(TIMESTAMP_SELECTOR).forEach(processElement);
 
         // Process edited timestamps
         root.querySelectorAll('span, div, td').forEach(processEditElement);
