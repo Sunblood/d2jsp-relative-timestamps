@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         d2jsp Relative Timestamps
 // @namespace    https://github.com/Sunblood/d2jsp-relative-timestamps
-// @version      1.1
+// @version      1.2
 // @description  Adds a relative time (e.g. "3 hours ago") next to d2jsp's static post timestamps, including "edited by" timestamps.
 // @author       Sunblood
 // @match        https://forums.d2jsp.org/*
@@ -69,8 +69,27 @@
 
     var updaters = [];
 
+    // Generated text stays out of the HTML-to-BBCode conversion used when editing posts.
+    var style = document.createElement('style');
+    style.textContent = '[data-d2jsp-relative-time]::after {' +
+        'content: attr(data-d2jsp-relative-time);' +
+        'opacity: .65; margin-left: 6px; font-size: .9em; white-space: nowrap;' +
+        '}';
+    document.head.appendChild(style);
+
+    function addRelativeTimestamp(el, date, text) {
+        if (!el.title) el.title = text.trim();
+
+        function update() {
+            el.dataset.d2jspRelativeTime = '(' + relativeFromNow(date) + ')';
+        }
+        update();
+        updaters.push(update);
+    }
+
     function processElement(el) {
         if (!el || el.nodeType !== 1) return;
+        if (el.closest('textarea, input, select, [contenteditable]')) return;
         if (el.dataset && el.dataset.d2jspRelts) return;
         if (el.children.length > 0) return;
 
@@ -82,22 +101,12 @@
 
         el.dataset.d2jspRelts = '1';
 
-        var rel = document.createElement('span');
-        rel.className = 'd2jsp-rel-ts';
-        rel.style.cssText = 'opacity:.65;margin-left:6px;font-size:.9em;white-space:nowrap;';
-        rel.title = text;
-
-        function update() {
-            rel.textContent = '(' + relativeFromNow(date) + ')';
-        }
-        update();
-
-        el.insertAdjacentElement('afterend', rel);
-        updaters.push(update);
+        addRelativeTimestamp(el, date, text);
     }
 
     function processEditElement(el) {
         if (!el || el.nodeType !== 1) return;
+        if (el.closest('textarea, input, select, [contenteditable]')) return;
         if (el.dataset && el.dataset.d2jspEditRelts) return;
 
         var text = el.textContent;
@@ -115,26 +124,22 @@
 
         el.dataset.d2jspEditRelts = '1';
 
-        var rel = document.createElement('span');
-        rel.className = 'd2jsp-rel-ts';
-        rel.style.cssText = 'opacity:.65;margin-left:6px;font-size:.9em;white-space:nowrap;';
-        rel.title = text.trim();
-
-        function update() {
-            rel.textContent = '(' + relativeFromNow(date) + ')';
-        }
-        update();
-
-        el.insertAdjacentElement('afterend', rel);
-        updaters.push(update);
+        addRelativeTimestamp(el, date, text);
     }
 
     function scan(root) {
-        var nodes = root.querySelectorAll('span, div, td');
-        for (var i = 0; i < nodes.length; i++) {
-            processElement(nodes[i]);
-            processEditElement(nodes[i]);
+        if (root.nodeType !== 1) return;
+
+        // Process root itself if applicable
+        if (root.matches('span[id^="td"]')) {
+            processElement(root);
         }
+
+        // Process timestamp spans
+        root.querySelectorAll('span[id^="td"]').forEach(processElement);
+
+        // Process edited timestamps
+        root.querySelectorAll('span, div, td').forEach(processEditElement);
     }
 
     // Initial pass
@@ -147,16 +152,31 @@
 
     // Handle content loaded/replaced dynamically (pagination, AJAX, new posts, etc.)
     var observer = new MutationObserver(function (mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            var added = mutations[i].addedNodes;
-            for (var j = 0; j < added.length; j++) {
-                var node = added[j];
+        for (var mutation of mutations) {
+            if (mutation.type === 'characterData') {
+                var parent = mutation.target.parentElement;
+
+                if (parent) {
+                    processElement(parent);
+                    processEditElement(parent);
+                }
+
+                continue;
+            }
+
+            for (var node of mutation.addedNodes) {
                 if (node.nodeType !== 1) continue;
+
                 processElement(node);
                 processEditElement(node);
                 scan(node);
             }
         }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
 })();
