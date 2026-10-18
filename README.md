@@ -12,9 +12,9 @@ A Tampermonkey userscript that adds a relative time (e.g. `(3 hours ago)`) next 
 ## How it works
 
 d2jsp post timestamps are rendered server-side as static text (e.g. `<span id="td123">Aug 24 2026 02:40pm</span>`)
-with no relative-time indicator on topic pages. This script scans the page for that exact format, appends a
-relative-time span after each match, refreshes it every 30 seconds, and watches for dynamically loaded content
-(pagination, AJAX-loaded posts) via a `MutationObserver`.
+with no relative-time indicator on topic pages. This script scans the page for that exact format and displays
+relative times through CSS. These labels stay out of the post text when editing. The script refreshes them
+every 30 seconds and watches for dynamically loaded content (pagination, AJAX-loaded posts) via a `MutationObserver`.
 
 **Known limitation:** relative times are computed assuming the displayed timestamp is in your browser's local
 timezone. If d2jsp renders times in a different fixed or account-configured timezone, the relative time will be
